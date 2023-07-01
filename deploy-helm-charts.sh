@@ -86,6 +86,25 @@ ALERTS
     done
 }
 
+function check_plugin(){
+    COMMAND_PLUGIN_LIST="${1}"
+    PLUGIN_LIST=(${2})
+
+    TOOLS_NAME="$(echo "${COMMAND_PLUGIN_LIST}" | awk '{print $1}')"
+
+    for plugin in ${PLUGIN_LIST[@]}; do
+        # If not found tools => exit
+        if [[ ! $(${COMMAND_PLUGIN_LIST} | grep "${plugin}") ]];then
+cat << ALERTS
+[x] Not found this ${TOOLS_NAME} plugin [${plugin}] on machine.
+
+Exit.
+ALERTS
+            exit 1
+        fi
+    done 
+}
+
 function pre_checking()
 {
     echo "[+] ACTION: ${ACTION}"
@@ -367,7 +386,7 @@ function build_helm_charts(){
                 fi
 
             elif [[ "${METHOD}" == "http" ]];then
-                helm push ${PACKAGE_PATH} -n ${HELM_PRIVATE_REPO_NAME}
+                helm cm-push ${PACKAGE_PATH} -n ${HELM_PRIVATE_REPO_NAME}
 
             elif [[ "${METHOD}" == "acr" ]];then
                 check_var 'ACR_NAME'
@@ -391,8 +410,9 @@ function build_helm_charts(){
 
 ###### START
 function main(){
-    # Checking supported tool on local machine
+    # Checking supported tool & plugin on local machine
     pre_check_dependencies "helm"
+    check_plugin "helm plugin list" "cm-push"
 
     # Pre-checking
     pre_checking
