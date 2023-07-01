@@ -147,7 +147,7 @@ function pre_checking()
         # Check if we miss credentials for http with cregs
         FLAG_FOUND_HTTP_CREDS="false"
 
-        if [[ ${HTTP_USER} != "" && ${HTTP_PASSWORD} != "" ]];then
+        if [[ ${HTTP_USER} != "none" && ${HTTP_PASSWORD} != "none" ]];then
             FLAG_FOUND_HTTP_CREDS="true"
         fi
 
@@ -386,7 +386,16 @@ function build_helm_charts(){
                 fi
 
             elif [[ "${METHOD}" == "http" ]];then
-                helm cm-push ${PACKAGE_PATH} -n ${HELM_PRIVATE_REPO_NAME}
+                if [[ ${FLAG_FOUND_HTTP_CREDS} == "false" ]];then 
+                    helm push ${DIR_CHART_REPO} ${PRIVATE_HELM_REPO_NAME}
+                else
+                    if [[ $(cat ${TMPFILE_CHART_INFO_REPO} | wc -l) -ne 0 ]];then
+                        helm cm-push --force ${PACKAGE_PATH} ${HELM_PRIVATE_REPO_NAME} --username ${HTTP_USER} --password ${HTTP_PASSWORD}
+                    else
+                        helm cm-push ${PACKAGE_PATH} ${HELM_PRIVATE_REPO_NAME} --username ${HTTP_USER} --password ${HTTP_PASSWORD}
+                    fi
+                    
+                fi
 
             elif [[ "${METHOD}" == "acr" ]];then
                 check_var 'ACR_NAME'
