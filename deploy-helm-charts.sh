@@ -1,34 +1,92 @@
 #!/bin/bash
-# Author: Dang Thanh Phat
-# Description:
-# + Tools need to install: helm, helm plugin push and helm s3
-# helm plugin install https://github.com/chartmuseum/helm-push.git
-# helm plugin install https://github.com/hypnoglow/helm-s3.git
-#
-# Cautions:
-# - No allow to override current version of helm package
+## Author: Dang Thanh Phat
+## Email: thanhphatit95@gmail.com
+## Web/blogs: www.itblognote.com
+## Description:
+## + Tools need to install: helm 
+##         helm plugin: helm push and helm s3
+##         helm plugin install https://github.com/chartmuseum/helm-push.git
+##         helm plugin install https://github.com/hypnoglow/helm-s3.git
+##
+## Cautions:
+## - No allow to override current version of helm package
+
+#### GLOBAL SETTING SHELL
+
+set +x;
+### Use flag -x with set to debug and show log command, and +x to hide
+set -o pipefail
+set -e
 
 ####################
-# Global variables #
+# GLOBAL VARIABLES #
 ####################
+
+#### VARIABLES
 
 # Action: plan will have people know what will happen
 # Method: will help script to choose method to connect Helm Repo: web http or aws s3 bucket
 ACTION="${1:-plan}"
-METHOD="${2:-s3}" #valid value: http / s3
+METHOD="${2:-http}" #valid value: http / s3 / acr
 
 # Directory contains template charts
-DIR_CHARTS="$PWD/charts"
-PRIVATE_HELM_REPO_NAME="${PRIVATE_HELM_REPO_NAME:-helm-charts}"
-S3_BUCKET_NAME="${S3_BUCKET_NAME:-none}" #set this variable if you use S3 storage for Helm Charts
+DIR_CHARTS="${PWD}/charts"
+
+HTTP_USER="${HTTP_USER:-none}"
+HTTP_PASSWORD="${HTTP_PASSWORD:-none}"
+
+HELM_PRIVATE_REPO_NAME="${HELM_PRIVATE_REPO_NAME:-helm-charts}"
+HELM_S3_BUCKET_NAME="${HELM_S3_BUCKET_NAME:-none}" #set this variable if you use S3 storage for Helm Charts
+HELM_ACR_URL_NAME="${HELM_ACR_URL_NAME:-none}" # Set this variable if you use ACR for Helm Charts
+
 LIST_IGNORE_LINT="${DIR_CHARTS}/list-ignore-lint.txt"
 TMPFILE=$(mktemp /tmp/tempfile-XXXXXXXX)
 TMPFILE_LIST_CHARTS=$(mktemp /tmp/tempfile-list-charts-XXXXXXXX)
 TMPFILE_CHART_INFO_REPO=$(mktemp /tmp/tempfile-chart-info-repo-XXXXXXXX)
 TMPDIR_PACKAGE_CHARTS=$(mktemp -d /tmp/tmpdir-helm-charts-package-XXXXXX)
 
-# Functions
-pre_checking()
+### Used with echo have flag -e
+RLC="\033[1;31m" ## Use Redlight color
+YC="\033[0;33m" ## Use yellow color
+EC="\033[0m" ## End color with no color
+
+#### FUNCTIONS
+
+function check_var(){
+    VAR_LIST=(${1})
+
+    for var in ${VAR_LIST[@]}; do
+        if [[ -z "$(eval echo $(echo $`eval echo "${var}"`))" ]];then
+            echo -e "${YC}[CAUTIONS] Variable ${var} not found!"
+            exit 1
+        fi
+    done
+}
+
+function pre_check_dependencies(){
+    ## All tools used in this script
+    TOOLS_LIST=(${1})
+
+    for tools in ${TOOLS_LIST[@]}; do
+        # If not found tools => exit
+        if [[ ! $(command -v ${tools}) ]];then
+cat << ALERTS
+[x] Not found tool [${tools}] on machine.
+
+[Ubuntu]
+sudo apt-get install ${tools} -y
+
+[MacOS]
+sudo brew install ${tools}
+
+Exit.
+ALERTS
+            exit 1
+        fi
+    done
+}
+
+function pre_checking()
 {
     echo "[+] ACTION: ${ACTION}"
     echo "[+] METHOD: ${METHOD}"
@@ -60,16 +118,51 @@ pre_checking()
         fi
 
         # Check if we get S3 Bucket Environment
-        if [[ ! $(echo "${S3_BUCKET_NAME}" | grep -i "^s3://" ) || "${S3_BUCKET_NAME}" == "none" ]];then
+        if [[ ! $(echo "${HELM_S3_BUCKET_NAME}" | grep -i "^s3://" ) || "${HELM_S3_BUCKET_NAME}" == "none" ]];then
             echo ""
-            echo "[x] CHECKING: cannot find Environment Variable [S3_BUCKET_NAME]"
+            echo "[x] CHECKING: cannot find Environment Variable [HELM_S3_BUCKET_NAME]"
             exit 1
         fi
 
     elif [[ "${METHOD}" == "http" ]];then
-        if [[ "$(env | grep -i "HOSTED_HELM_REPO_URL" | awk -F'=' '{print $2}')" == "" ]];then
+        # Check if we miss credentials for http with cregs
+        FLAG_FOUND_HTTP_CREDS="false"
+
+        if [[ ${HTTP_USER} != "" && ${HTTP_PASSWORD} != "" ]];then
+            FLAG_FOUND_HTTP_CREDS="true"
+        fi
+
+        if [[ "${FLAG_FOUND_HTTP_CREDS}" == "false" ]];then
             echo ""
-            echo "[x] CHECKING: cannot find env variable [HOSTED_HELM_REPO_URL] when you want to use Helm authenticate HTTP Web App"
+            echo -e "${YC}[*] CAUTIONS: if your URL have not account security, add value `none` to variables [HTTP_USER] & [HTTP_PASSWORD] please!"
+            echo -e "${YC}[x] CHECKING: cannot find HTTP Credentials when you want to use Helm with URL have security"
+            exit 1
+        fi
+
+        if [[ "$(env | grep -i "HELM_HOSTED_REPO_URL" | awk -F'=' '{print $2}')" == "" ]];then
+            echo ""
+            echo -e "${YC}[x] CHECKING: cannot find env variable [HELM_HOSTED_REPO_URL] when you want to use Helm authenticate HTTP Web App"
+            exit 1
+        fi 
+
+    elif [[ "${METHOD}" == "acr" ]];then
+        # Check if we miss credentials for http with cregs
+        FLAG_FOUND_AZ_CREDS="false"
+
+        if [[ ${AZ_USER} != "" && ${AZ_PASSWORD} != "" ]];then
+            FLAG_FOUND_AZ_CREDS="true"
+        fi
+
+        if [[ "${FLAG_FOUND_AZ_CREDS}" == "false" ]];then
+            echo ""
+            echo -e "${YC}[x] CHECKING: cannot find AZ Credentials when you want to use Helm Azure ACR"
+            exit 1
+        fi
+
+        # Check if we get S3 Bucket Environment
+        if [[ ! $(echo "${HELM_ACR_URL_NAME}" | grep -i "^azurecr.io" ) || "${HELM_ACR_URL_NAME}" == "none" ]];then
+            echo ""
+            echo "[x] CHECKING: cannot find Environment Variable [HELM_ACR_URL_NAME]"
             exit 1
         fi
     fi
@@ -96,7 +189,7 @@ pre_checking()
     fi
 }
 
-cleanup()
+function cleanup()
 {
     # Cleanup
     echo ""
@@ -119,156 +212,216 @@ cleanup()
     fi
 
     # Helm remove repo after work
-    if [[ "$(helm repo list | grep -i "${PRIVATE_HELM_REPO_NAME}")" ]];then
+    if [[ "$(helm repo list | grep -i "${HELM_PRIVATE_REPO_NAME}")" ]];then
         # Remove current setting Helm Repo to add new
-        helm repo remove ${PRIVATE_HELM_REPO_NAME}
+        helm repo remove ${HELM_PRIVATE_REPO_NAME}
     fi
 }
 
-# Setting shell
-set -e
-
-# Pre-checking
-pre_checking
-
-# Find list chart repository
-echo ""
-echo "[*] List Helm Chart Configurations are found :"
-find ${DIR_CHARTS} -type f -name 'Chart.yaml' > ${TMPFILE}
-cat ${TMPFILE}
-echo ""
-
-
-###################################
-# Connect Private Helm Repository #
-###################################
-echo "[+] Connect Private Helm Repository: ${PRIVATE_HELM_REPO_NAME}"
-if [[ $(helm repo list | grep -i ${PRIVATE_HELM_REPO_NAME} | awk '{print $1}') == ${PRIVATE_HELM_REPO_NAME} ]];then
-    # Remove current setting Helm Repo to add new
-    helm repo remove ${PRIVATE_HELM_REPO_NAME} 2> /dev/null
-fi
-
-if [[ "${METHOD}" == "s3" ]];then
-    # Connect to Helm Chart Service with S3 Plugin - S3 Bucket AWS
-    helm repo add ${PRIVATE_HELM_REPO_NAME} ${S3_BUCKET_NAME}
-
-elif [[ "${METHOD}" == "http" ]];then
-    # Connect to Helm Chart Service with Web HTTP Method
-    helm repo add ${PRIVATE_HELM_REPO_NAME} ${HOSTED_HELM_REPO_URL}
-
-fi
-
-# Update list helm chart repositories
-helm repo update
-
-# List active Helm Repositories
-echo ""
-echo "[+] List active Helm Repositories"
-helm repo list
-
-# List Helm Charts in specific Hosted Private Helm Repository
-echo ""
-echo "[+] List Helm Charts in Private Helm Repository: ${PRIVATE_HELM_REPO_NAME}"
-helm search repo ${PRIVATE_HELM_REPO_NAME} --versions > ${TMPFILE_LIST_CHARTS}
-cat ${TMPFILE_LIST_CHARTS}
-echo ""
-
-
-################################
-# Loop process each chart repo #
-################################
-while read chart
-do
-    DIR_CHART_REPO="$(dirname $chart)"
-    CHART_NAME=$(cat ${DIR_CHART_REPO}/Chart.yaml | grep -i "^name" | awk -F':' '{print $2}' | tr -d ' ')
-    CHART_PACKAGE_VERSION=$(cat ${DIR_CHART_REPO}/Chart.yaml | grep -i "^version" | awk -F':' '{print $2}' | tr -d ' ')
-
+function find_charts_list(){
+    # Find list chart repository
     echo ""
-    echo "**"
-    echo "** Chart: ${CHART_NAME} **"
-    echo "**"
-    echo "[+] Creating package for chart name: ${CHART_NAME}"
-    echo "[+] Chart path: ${DIR_CHART_REPO}"
-    echo "[+] Chart version: ${CHART_PACKAGE_VERSION}"
-
+    echo "[*] List Helm Chart Configurations are found :"
+    find ${DIR_CHARTS} -type f -name 'Chart.yaml' > ${TMPFILE}
+    cat ${TMPFILE}
     echo ""
-    echo "[?] Check helm chart version exists on Helm Repository [${PRIVATE_HELM_REPO_NAME}] or NOT ?"
+}
 
-    # Check if helm chart package exists on private helm repository
-    grep "\b${PRIVATE_HELM_REPO_NAME}/${CHART_NAME}\b" ${TMPFILE_LIST_CHARTS} | tee ${TMPFILE_CHART_INFO_REPO}
-    echo ""
-    
-    ## Use awk support -v arg | Old method
-    #awk -v chartname="${PRIVATE_HELM_REPO_NAME}/${CHART_NAME}" '$1==chartname {print $i}' ${TMPFILE_LIST_CHARTS} | tee ${TMPFILE_CHART_INFO_REPO}
+function connect_helm_repo(){
+    ###################################
+    # Connect Private Helm Repository #
+    ###################################
+    echo "[+] Connect Private Helm Repository: ${HELM_PRIVATE_REPO_NAME}"
+    if [[ $(helm repo list | grep -i ${HELM_PRIVATE_REPO_NAME} | awk '{print $1}') == ${HELM_PRIVATE_REPO_NAME} ]];then
+        # Remove current setting Helm Repo to add new
+        helm repo remove ${HELM_PRIVATE_REPO_NAME} 2> /dev/null
+    fi
 
-    if [[ $(cat ${TMPFILE_CHART_INFO_REPO} | wc -l) -ne 0 ]];then
-        # Check if version in current helm package <dir>/Chart.yaml
-        # already exists on private helm repository
-        #CHART_INFO_VERSION_ON_REPO="$(head -n 1 ${TMPFILE_CHART_INFO_REPO} | awk '{print $2}')"
-        if [[ $(cat ${TMPFILE_CHART_INFO_REPO} | grep -i "$CHART_PACKAGE_VERSION" | awk '{print $2}' | head -n1) == $CHART_PACKAGE_VERSION ]];then
-            echo "Helm release version in file [Chart.yaml]: $CHART_PACKAGE_VERSION"
-            echo "Helm release all versions on Private Repository:"
-            cat $TMPFILE_CHART_INFO_REPO | awk '{print $1,$2}'
-            echo ""
-            echo "[-] RESULT: this version [$CHART_PACKAGE_VERSION] exist in repository"
-            echo "[>] DECISION: bypass proceeding this version helm package anymore"
-            continue
+    if [[ "${METHOD}" == "s3" ]];then
+        # Connect to Helm Chart Service with S3 Plugin - S3 Bucket AWS
+        helm repo add ${HELM_PRIVATE_REPO_NAME} ${HELM_S3_BUCKET_NAME}
 
+    elif [[ "${METHOD}" == "acr" ]];then
+        # Connect to Helm Chart Service with ACR Method
+        helm repo add ${HELM_PRIVATE_REPO_NAME} https://${HELM_ACR_URL_NAME}/helm/v1/repo --username ${AZ_USER} --password ${AZ_PASSWORD}
+
+    elif [[ "${METHOD}" == "http" ]];then
+        if [[ ${HTTP_USER} == "none" && ${HTTP_PASSWORD} == "none" ]];then
+            # Connect to Helm Chart Service with Web HTTP Method
+            helm repo add ${HELM_PRIVATE_REPO_NAME} ${HELM_HOSTED_REPO_URL}
         else
-            echo "Helm release version in file [Chart.yaml]: $CHART_PACKAGE_VERSION"
-            echo "Helm release all versions on Private Repository:"
-            cat $TMPFILE_CHART_INFO_REPO | awk '{print $1,$2}'
-            echo ""
-            echo "[-] RESULT: this version [$CHART_PACKAGE_VERSION] does not exist on repository"
-            echo "[>] DECISION: continue to proceed this version helm package"
-
+            helm repo add ${HELM_PRIVATE_REPO_NAME} ${HELM_HOSTED_REPO_URL} --username ${HTTP_USER} --password ${HTTP_PASSWORD}
         fi
-    else
-        echo "[-] RESULT: this helm release does not exists on Private Repository"
-        echo "[>] DECISION: continue to proceed this version helm package"
+
     fi
 
-    # Ignore helm lint if in list
-    if [[ $(grep "^$CHART_NAME" $LIST_IGNORE_LINT) ]];then
+    # Update list helm chart repositories
+    helm repo update
+
+    # List active Helm Repositories
+    echo ""
+    echo "[+] List active Helm Repositories"
+    helm repo list
+
+    # List Helm Charts in specific Hosted Private Helm Repository
+    echo ""
+    echo "[+] List Helm Charts in Private Helm Repository: ${HELM_PRIVATE_REPO_NAME}"
+    helm search repo ${HELM_PRIVATE_REPO_NAME} --versions > ${TMPFILE_LIST_CHARTS}
+    cat ${TMPFILE_LIST_CHARTS}
+    echo ""
+}
+
+function build_helm_charts(){
+    ################################
+    # Loop process each chart repo #
+    ################################
+    CHART_COMMITID_VERSION_ENABLE="${CHART_COMMITID_VERSION_ENABLE:-false}"
+
+    while read chart
+    do
+        DIR_CHART_REPO="$(dirname $chart)"
+        CHART_NAME=$(cat ${DIR_CHART_REPO}/Chart.yaml | grep -i "^name" | awk -F':' '{print $2}' | tr -d ' ')
+        if [[ ${CHART_COMMITID_VERSION_ENABLE} == "true" ]];then
+            check_var '"CHART_COMMITID_VERSION"'
+            CHART_PACKAGE_VERSION=${CHART_COMMITID_VERSION}
+        else
+            CHART_PACKAGE_VERSION=$(cat ${DIR_CHART_REPO}/Chart.yaml | grep -i "^version" | awk -F':' '{print $2}' | tr -d ' ')
+        fi
+
         echo ""
-        echo "[-] Helm lint : $CHART_NAME"
-        helm lint $DIR_CHART_REPO
-        continue
-    fi
+        echo "**"
+        echo "** Chart: ${CHART_NAME} **"
+        echo "**"
+        echo "[+] Creating package for chart name: ${CHART_NAME}"
+        echo "[+] Chart path: ${DIR_CHART_REPO}"
+        echo "[+] Chart version: ${CHART_PACKAGE_VERSION}"
 
-    # Upload package to Helm repo only when ACTION="apply"
-    if [[ ${ACTION} == "apply" ]];then
         echo ""
-        echo "[+] ACTION: ${ACTION}"
-        echo "[+] METHOD: ${METHOD}"
-        echo "[-] Helm dep update : $CHART_NAME"
-        helm dep update $DIR_CHART_REPO
+        echo "[?] Check helm chart version exists on Helm Repository [${HELM_PRIVATE_REPO_NAME}] or NOT ?"
 
-        echo "[-] Helm push: ${CHART_NAME} => repo: ${PRIVATE_HELM_REPO_NAME}"
+        # Check if helm chart package exists on private helm repository
+        grep "\b${HELM_PRIVATE_REPO_NAME}/${CHART_NAME}\b" ${TMPFILE_LIST_CHARTS} | tee ${TMPFILE_CHART_INFO_REPO}
+        echo ""
+        
+        ## Use awk support -v arg | Old method
+        #awk -v chartname="${HELM_PRIVATE_REPO_NAME}/${CHART_NAME}" '$1==chartname {print $i}' ${TMPFILE_LIST_CHARTS} | tee ${TMPFILE_CHART_INFO_REPO}
 
-        if [[ "${METHOD}" == "s3" ]];then
-            # We need to package chart first then push with S3 plugin
-            helm package --dependency-update --destination ${TMPDIR_PACKAGE_CHARTS} ${DIR_CHART_REPO}
-            PACKAGE_PATH="${TMPDIR_PACKAGE_CHARTS}/${CHART_NAME}-${CHART_PACKAGE_VERSION}.tgz"
-            if [[ $(cat ${TMPFILE_CHART_INFO_REPO} | wc -l) -ne 0 ]];then
-              helm s3 push --force ${PACKAGE_PATH} ${PRIVATE_HELM_REPO_NAME}
+        if [[ $(cat ${TMPFILE_CHART_INFO_REPO} | wc -l) -ne 0 ]];then
+            # Check if version in current helm package <dir>/Chart.yaml
+            # already exists on private helm repository
+            #CHART_INFO_VERSION_ON_REPO="$(head -n 1 ${TMPFILE_CHART_INFO_REPO} | awk '{print $2}')"
+            if [[ $(cat ${TMPFILE_CHART_INFO_REPO} | grep -i "$CHART_PACKAGE_VERSION" | awk '{print $2}' | head -n1) == $CHART_PACKAGE_VERSION ]];then
+                echo "Helm release version in file [Chart.yaml]: $CHART_PACKAGE_VERSION"
+                echo "Helm release all versions on Private Repository:"
+                cat $TMPFILE_CHART_INFO_REPO | awk '{print $1,$2}'
+                echo ""
+                echo "[-] RESULT: this version [$CHART_PACKAGE_VERSION] exist in repository"
+                echo "[>] DECISION: bypass proceeding this version helm package anymore"
+                continue
+
             else
-              helm s3 push ${PACKAGE_PATH} ${PRIVATE_HELM_REPO_NAME}
+                echo "Helm release version in file [Chart.yaml]: $CHART_PACKAGE_VERSION"
+                echo "Helm release all versions on Private Repository:"
+                cat $TMPFILE_CHART_INFO_REPO | awk '{print $1,$2}'
+                echo ""
+                echo "[-] RESULT: this version [$CHART_PACKAGE_VERSION] does not exist on repository"
+                echo "[>] DECISION: continue to proceed this version helm package"
+
+            fi
+        else
+            echo "[-] RESULT: this helm release does not exists on Private Repository"
+            echo "[>] DECISION: continue to proceed this version helm package"
+        fi
+
+        # Ignore helm lint if in list
+        if [[ $(grep "^$CHART_NAME" $LIST_IGNORE_LINT) ]];then
+            echo ""
+            echo "[-] Helm lint : $CHART_NAME"
+            helm lint $DIR_CHART_REPO
+            continue
+        fi
+
+        # Upload package to Helm repo only when ACTION="apply"
+        if [[ ${ACTION} == "apply" ]];then
+            echo ""
+            echo "[+] ACTION: ${ACTION}"
+            echo "[+] METHOD: ${METHOD}"
+            echo "[-] Helm dep update : $CHART_NAME"
+            helm dep update $DIR_CHART_REPO
+
+            echo "[-] Helm push: ${CHART_NAME} => repo: ${HELM_PRIVATE_REPO_NAME}"
+
+            # We need to package chart first then push with S3 plugin
+            if [[ ${CHART_COMMITID_VERSION_ENABLE} == "true" ]];then
+                HELM_COMMAND_VERSION="--version ${CHART_PACKAGE_VERSION}"
             fi
 
-        elif [[ "${METHOD}" == "http" ]];then
-            helm push ${DIR_CHART_REPO} ${PRIVATE_HELM_REPO_NAME}
+            helm package --dependency-update ${HELM_COMMAND_VERSION} --destination ${TMPDIR_PACKAGE_CHARTS} ${DIR_CHART_REPO}
+            PACKAGE_PATH="${TMPDIR_PACKAGE_CHARTS}/${CHART_NAME}-${CHART_PACKAGE_VERSION}.tgz"
+
+            if [[ "${METHOD}" == "s3" ]];then
+                if [[ $(cat ${TMPFILE_CHART_INFO_REPO} | wc -l) -ne 0 ]];then
+                    helm s3 push --force ${PACKAGE_PATH} ${HELM_PRIVATE_REPO_NAME}
+                else
+                    helm s3 push ${PACKAGE_PATH} ${HELM_PRIVATE_REPO_NAME}
+                fi
+
+            elif [[ "${METHOD}" == "http" ]];then
+                helm push ${PACKAGE_PATH} ${HELM_PRIVATE_REPO_NAME}
+
+            elif [[ "${METHOD}" == "acr" ]];then
+                check_var '"ACR_NAME"'
+                pre_check_dependencies '"az"'
+                if [[ $(cat ${TMPFILE_CHART_INFO_REPO} | wc -l) -ne 0 ]];then
+                    az acr helm push --force -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
+                else
+                    az acr helm push -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
+                fi
+            fi
+
+            echo ""
+        else
+            echo "[+] ACTION: ${ACTION}"
+            echo "[-] Stop processing upload Helm Chart: $CHART_NAME"
         fi
 
-        echo ""
-    else
-        echo "[+] ACTION: ${ACTION}"
-        echo "[-] Stop processing upload Helm Chart: $CHART_NAME"
-    fi
+    done < ${TMPFILE}
+}
 
-done < ${TMPFILE}
 
-# Cleanup
-cleanup
+###### START
+function main(){
+    # Checking supported tool on local machine
+    pre_check_dependencies '"helm"'
+
+    # Pre-checking
+    pre_checking
+    
+    # Find chart list in source
+    find_charts_list
+
+    # Connect to helm private repo
+    connect_helm_repo
+
+    build_helm_charts
+    # # Action based on ${ACTION} arg
+    # case ${ACTION} in
+    # "-v" | "--version")
+    #     about
+    #     ;;
+    # "-h" | "--help")
+    #     help
+    #     ;;
+    # *)
+    #     # echo -n "Error: Something wrong"
+    #     # help
+    #     ;;
+    # esac
+
+    # Clean trash of service
+    cleanup
+}
+
+main "${@}"
 
 exit 0
