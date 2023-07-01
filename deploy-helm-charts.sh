@@ -291,7 +291,7 @@ function connect_helm_repo(){
     # Connect Private Helm Repository #
     ###################################
     echo "[+] Connect Private Helm Repository: ${HELM_PRIVATE_REPO_NAME}"
-    if [[ $(helm repo list | grep -i ${HELM_PRIVATE_REPO_NAME} | awk '{print $1}') == ${HELM_PRIVATE_REPO_NAME} ]];then
+    if [[ $(helm repo list 2> /dev/null | grep -i ${HELM_PRIVATE_REPO_NAME} | awk '{print $1}') == ${HELM_PRIVATE_REPO_NAME} ]];then
         # Remove current setting Helm Repo to add new
         helm repo remove ${HELM_PRIVATE_REPO_NAME} 2> /dev/null
     fi
