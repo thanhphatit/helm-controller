@@ -27,7 +27,7 @@ set -e
 # Action: plan will have people know what will happen
 # Method: will help script to choose method to connect Helm Repo: web http or aws s3 bucket
 ACTION="${1:-plan}"
-METHOD="${2:-http}" #valid value: http / s3 / acr
+METHOD="${2:-http}" # Valid value: http / s3 / acr
 
 # Directory contains template charts
 DIR_CHARTS="${PWD}/charts"
@@ -36,8 +36,8 @@ HTTP_USER="${HTTP_USER:-none}"
 HTTP_PASSWORD="${HTTP_PASSWORD:-none}"
 
 HELM_PRIVATE_REPO_NAME="${HELM_PRIVATE_REPO_NAME:-helm-charts}"
-HELM_S3_BUCKET_NAME="${HELM_S3_BUCKET_NAME:-none}" #set this variable if you use S3 storage for Helm Charts
-HELM_ACR_URL_NAME="${HELM_ACR_URL_NAME:-none}" # Set this variable if you use ACR for Helm Charts
+S3_BUCKET_NAME="${S3_BUCKET_NAME:-none}" #set this variable if you use S3 storage for Helm Charts
+ACR_NAME="${ACR_NAME:-none}" # Set this variable if you use ACR for Helm Charts
 
 LIST_IGNORE_LINT="${DIR_CHARTS}/list-ignore-lint.txt"
 TMPFILE=$(mktemp /tmp/tempfile-XXXXXXXX)
@@ -102,7 +102,9 @@ Exit.
 ALERTS
             exit 1
         fi
-    done 
+    done
+
+    #### Example: check_plugin "cm-push diff s3" 
 }
 
 function pre_checking()
@@ -137,9 +139,9 @@ function pre_checking()
         fi
 
         # Check if we get S3 Bucket Environment
-        if [[ ! $(echo "${HELM_S3_BUCKET_NAME}" | grep -i "^s3://" ) || "${HELM_S3_BUCKET_NAME}" == "none" ]];then
+        if [[ ! $(echo "${S3_BUCKET_NAME}" | grep -i "^s3://" ) || "${S3_BUCKET_NAME}" == "none" ]];then
             echo ""
-            echo "[x] CHECKING: cannot find Environment Variable [HELM_S3_BUCKET_NAME]"
+            echo "[x] CHECKING: cannot find Environment Variable [S3_BUCKET_NAME]"
             exit 1
         fi
 
@@ -149,13 +151,6 @@ function pre_checking()
 
         if [[ ${HTTP_USER} != "none" && ${HTTP_PASSWORD} != "none" ]];then
             FLAG_FOUND_HTTP_CREDS="true"
-        fi
-
-        if [[ "${FLAG_FOUND_HTTP_CREDS}" == "false" ]];then
-            echo ""
-            echo -e "${YC}[*] CAUTIONS: if your URL have not account security, add value `none` to variables [HTTP_USER] & [HTTP_PASSWORD] please!"
-            echo -e "${YC}[x] CHECKING: cannot find HTTP Credentials when you want to use Helm with URL have security"
-            exit 1
         fi
 
         if [[ "$(env | grep -i "HELM_HOSTED_REPO_URL" | awk -F'=' '{print $2}')" == "" ]];then
@@ -178,10 +173,10 @@ function pre_checking()
             exit 1
         fi
 
-        # Check if we get S3 Bucket Environment
-        if [[ ! $(echo "${HELM_ACR_URL_NAME}" | grep -i "^azurecr.io" ) || "${HELM_ACR_URL_NAME}" == "none" ]];then
+        # Check if we get ACR name Environment
+        if [[ "${ACR_NAME}" == "none" ]];then
             echo ""
-            echo "[x] CHECKING: cannot find Environment Variable [HELM_ACR_URL_NAME]"
+            echo "[x] CHECKING: cannot find Environment Variable [ACR_NAME]"
             exit 1
         fi
     fi
@@ -258,11 +253,11 @@ function connect_helm_repo(){
 
     if [[ "${METHOD}" == "s3" ]];then
         # Connect to Helm Chart Service with S3 Plugin - S3 Bucket AWS
-        helm repo add ${HELM_PRIVATE_REPO_NAME} ${HELM_S3_BUCKET_NAME}
+        helm repo add ${HELM_PRIVATE_REPO_NAME} ${S3_BUCKET_NAME}
 
     elif [[ "${METHOD}" == "acr" ]];then
         # Connect to Helm Chart Service with ACR Method
-        helm repo add ${HELM_PRIVATE_REPO_NAME} https://${HELM_ACR_URL_NAME}/helm/v1/repo --username ${AZ_USER} --password ${AZ_PASSWORD}
+        helm repo add ${HELM_PRIVATE_REPO_NAME} https://${ACR_NAME}.azurecr.io/helm/v1/repo --username ${AZ_USER} --password ${AZ_PASSWORD}
 
     elif [[ "${METHOD}" == "http" ]];then
         if [[ ${HTTP_USER} == "none" && ${HTTP_PASSWORD} == "none" ]];then
@@ -386,6 +381,8 @@ function build_helm_charts(){
                 fi
 
             elif [[ "${METHOD}" == "http" ]];then
+                check_plugin "helm plugin list" "cm-push"
+                
                 if [[ ${FLAG_FOUND_HTTP_CREDS} == "false" ]];then 
                     helm push ${DIR_CHART_REPO} ${PRIVATE_HELM_REPO_NAME}
                 else
@@ -398,8 +395,8 @@ function build_helm_charts(){
                 fi
 
             elif [[ "${METHOD}" == "acr" ]];then
-                check_var 'ACR_NAME'
-                pre_check_dependencies '"az"'
+                check_var "ACR_NAME AZ_USER AZ_PASSWORD"
+                pre_check_dependencies "az"
                 if [[ $(cat ${TMPFILE_CHART_INFO_REPO} | wc -l) -ne 0 ]];then
                     az acr helm push --force -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
                 else
@@ -421,7 +418,6 @@ function build_helm_charts(){
 function main(){
     # Checking supported tool & plugin on local machine
     pre_check_dependencies "helm"
-    check_plugin "helm plugin list" "cm-push"
 
     # Pre-checking
     pre_checking
