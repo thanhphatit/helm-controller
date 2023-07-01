@@ -392,6 +392,7 @@ function build_helm_charts(){
 ###### START
 function main(){
     # Checking supported tool on local machine
+    helm --version
     pre_check_dependencies '"helm"'
 
     # Pre-checking
