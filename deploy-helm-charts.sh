@@ -109,17 +109,50 @@ ALERTS
     #### Example: check_plugin "cm-push diff s3" 
 }
 
+function compare_versions() {
+    local VERSION_01=${1}
+    local VERSION_02=${2}
+    VERSION_EQ="false"
+
+    if [[ ${VERSION_01} == ${VERSION_02} ]]; then
+        echo "equal"
+    else
+        local IFS=.
+        local ver1=(${VERSION_01})
+        local ver2=(${VERSION_02})
+
+        local len=${#ver1[@]}
+        for ((i=0; i<len; i++)); do
+        if [[ -z ${ver2[i]} ]]; then
+            ver2[i]=0
+        fi
+
+        if ((10#${ver1[i]} < 10#${ver2[i]})); then
+            echo "less"
+            return
+        fi
+
+        if ((10#${ver1[i]} > 10#${ver2[i]})); then
+            echo "greater"
+            return
+        fi
+        done
+
+        echo "equal"
+    fi
+}
+
 function pre_checking()
 {
     echo "[+] ACTION: ${ACTION}"
     echo "[+] METHOD: ${METHOD}"
     
-    HELM_VERSION_CURRENT=$(helm version --short --client 2>/dev/null | awk -F'+' '{print $1}' | awk -F'[v.]' '{print $2$3$4}')
-    HELM_VERSION_LIMMIT="3080"
+    local HELM_VERSION_CURRENT=$(helm version --short --client 2>/dev/null | awk -F'+' '{print $1}' | awk -F'v' '{print $2}')
+    local HELM_VERSION_LIMMIT="3.8.0"
 
-    helm version --short --client 2>/dev/null
-    echo "${HELM_VERSION_CURRENT}"
-    if [[ ${HELM_VERSION_CURRENT} < ${HELM_VERSION_LIMMIT} ]];then
+    local RESULT_COMPARE_HELM_VERSION=$(compare_versions "${HELM_VERSION_CURRENT}" "${HELM_VERSION_LIMMIT}")
+
+    if [[ ${RESULT_COMPARE_HELM_VERSION} == "less" ]];then
         echo "[WARNING] Because helm version current less than 3.8.0, so we will add variable [HELM_EXPERIMENTAL_OCI=1]"
         export HELM_EXPERIMENTAL_OCI=1
     fi
