@@ -367,7 +367,7 @@ function build_helm_charts(){
                 fi
 
             elif [[ "${METHOD}" == "http" ]];then
-                helm push ${PACKAGE_PATH} ${HELM_PRIVATE_REPO_NAME}
+                helm push ${PACKAGE_PATH} -n ${HELM_PRIVATE_REPO_NAME}
 
             elif [[ "${METHOD}" == "acr" ]];then
                 check_var 'ACR_NAME'
