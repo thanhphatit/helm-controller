@@ -282,7 +282,7 @@ function build_helm_charts(){
         DIR_CHART_REPO="$(dirname $chart)"
         CHART_NAME=$(cat ${DIR_CHART_REPO}/Chart.yaml | grep -i "^name" | awk -F':' '{print $2}' | tr -d ' ')
         if [[ ${CHART_COMMITID_VERSION_ENABLE} == "true" ]];then
-            check_var '"CHART_COMMITID_VERSION"'
+            check_var 'CHART_COMMITID_VERSION'
             CHART_PACKAGE_VERSION=${CHART_COMMITID_VERSION}
         else
             CHART_PACKAGE_VERSION=$(cat ${DIR_CHART_REPO}/Chart.yaml | grep -i "^version" | awk -F':' '{print $2}' | tr -d ' ')
@@ -370,7 +370,7 @@ function build_helm_charts(){
                 helm push ${PACKAGE_PATH} ${HELM_PRIVATE_REPO_NAME}
 
             elif [[ "${METHOD}" == "acr" ]];then
-                check_var '"ACR_NAME"'
+                check_var 'ACR_NAME'
                 pre_check_dependencies '"az"'
                 if [[ $(cat ${TMPFILE_CHART_INFO_REPO} | wc -l) -ne 0 ]];then
                     az acr helm push --force -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
@@ -392,8 +392,7 @@ function build_helm_charts(){
 ###### START
 function main(){
     # Checking supported tool on local machine
-    helm --version
-    pre_check_dependencies '"helm"'
+    pre_check_dependencies "helm"
 
     # Pre-checking
     pre_checking
@@ -405,6 +404,7 @@ function main(){
     connect_helm_repo
 
     build_helm_charts
+
     # # Action based on ${ACTION} arg
     # case ${ACTION} in
     # "-v" | "--version")
