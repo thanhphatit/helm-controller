@@ -117,6 +117,8 @@ function pre_checking()
     HELM_VERSION_CURRENT=$(helm version --short --client 2>/dev/null | awk -F'+' '{print $1}' | awk -F'[v.]' '{print $2$3$4}')
     HELM_VERSION_LIMMIT="3080"
 
+    helm version --short --client 2>/dev/null
+    echo "${HELM_VERSION_CURRENT}"
     if [[ ${HELM_VERSION_CURRENT} < ${HELM_VERSION_LIMMIT} ]];then
         echo "[WARNING] Because helm version current less than 3.8.0, so we will add variable [HELM_EXPERIMENTAL_OCI=1]"
         export HELM_EXPERIMENTAL_OCI=1
