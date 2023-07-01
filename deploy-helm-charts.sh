@@ -37,7 +37,9 @@ HTTP_PASSWORD="${HTTP_PASSWORD:-none}"
 
 HELM_PRIVATE_REPO_NAME="${HELM_PRIVATE_REPO_NAME:-helm-charts}"
 S3_BUCKET_NAME="${S3_BUCKET_NAME:-none}" #set this variable if you use S3 storage for Helm Charts
+
 ACR_NAME="${ACR_NAME:-none}" # Set this variable if you use ACR for Helm Charts
+ACR_ARTIFACT_NAME="oci://${ACR_NAME}.azurecr.io/helm"
 
 LIST_IGNORE_LINT="${DIR_CHARTS}/list-ignore-lint.txt"
 TMPFILE=$(mktemp /tmp/tempfile-XXXXXXXX)
@@ -174,9 +176,9 @@ function pre_checking()
         fi
 
         # Check if we get ACR name Environment
-        if [[ "${ACR_NAME}" == "none" ]];then
+        if [[ ! $(echo "${ACR_ARTIFACT_NAME}" | grep -i "^oci://" ) ]];then
             echo ""
-            echo "[x] CHECKING: cannot find Environment Variable [ACR_NAME]"
+            echo "[x] CHECKING: cannot find Environment Variable [ACR_ARTIFACT_NAME]"
             exit 1
         fi
     fi
@@ -258,6 +260,7 @@ function connect_helm_repo(){
     elif [[ "${METHOD}" == "acr" ]];then
         # Connect to Helm Chart Service with ACR Method
         helm repo add ${HELM_PRIVATE_REPO_NAME} https://${ACR_NAME}.azurecr.io/helm/v1/repo --username ${AZ_USER} --password ${AZ_PASSWORD}
+        helm registry login ${ACR_NAME}.azurecr.io --username ${AZ_USER} --password ${AZ_PASSWORD}
 
     elif [[ "${METHOD}" == "http" ]];then
         if [[ ${HTTP_USER} == "none" && ${HTTP_PASSWORD} == "none" ]];then
@@ -398,9 +401,11 @@ function build_helm_charts(){
                 check_var "ACR_NAME AZ_USER AZ_PASSWORD"
                 pre_check_dependencies "az"
                 if [[ $(cat ${TMPFILE_CHART_INFO_REPO} | wc -l) -ne 0 ]];then
-                    az acr helm push --force -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
+                    #az acr helm push --force -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
+                    helm push --force ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
                 else
-                    az acr helm push -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
+                    helm push ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
+                    #az acr helm push -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
                 fi
             fi
 
