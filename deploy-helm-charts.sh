@@ -13,8 +13,6 @@
 
 #### GLOBAL SETTING SHELL
 
-set +x;
-### Use flag -x with set to debug and show log command, and +x to hide
 set -o pipefail
 set -e
 
@@ -28,6 +26,10 @@ set -e
 # Method: will help script to choose method to connect Helm Repo: web http or aws s3 bucket
 ACTION="${1:-plan}"
 METHOD="${2:-http}" # Valid value: http / s3 / acr
+DEBUG="${3:-+x}"
+
+### Use flag -x with set to debug and show log command, and +x to hide
+set ${DEBUG};
 
 # Directory contains template charts
 DIR_CHARTS="${PWD}/charts"
@@ -48,14 +50,16 @@ TMPFILE_CHART_INFO_REPO=$(mktemp /tmp/tempfile-chart-info-repo-XXXXXXXX)
 TMPDIR_PACKAGE_CHARTS=$(mktemp -d /tmp/tmpdir-helm-charts-package-XXXXXX)
 
 ### Used with echo have flag -e
-RLC="\033[1;31m" ## Use Redlight color
-YC="\033[0;33m" ## Use yellow color
-EC="\033[0m" ## End color with no color
+RLC="\033[1;31m"    ## Use redlight color
+GC="\033[0;32m"     ## Use green color
+YC="\033[0;33m"     ## Use yellow color
+BC="\033[0;34m"     ## Use blue color
+EC="\033[0m"        ## End color with no color
 
 #### FUNCTIONS
 
 function check_var(){
-    VAR_LIST=(${1})
+    local VAR_LIST=(${1})
 
     for var in ${VAR_LIST[@]}; do
         if [[ -z "$(eval echo $(echo $`eval echo "${var}"`))" ]];then
@@ -67,7 +71,7 @@ function check_var(){
 
 function pre_check_dependencies(){
     ## All tools used in this script
-    TOOLS_LIST=(${1})
+    local TOOLS_LIST=(${1})
 
     for tools in ${TOOLS_LIST[@]}; do
         # If not found tools => exit
@@ -75,24 +79,20 @@ function pre_check_dependencies(){
 cat << ALERTS
 [x] Not found tool [${tools}] on machine.
 
-[Ubuntu]
-sudo apt-get install ${tools} -y
-
-[MacOS]
-sudo brew install ${tools}
-
 Exit.
 ALERTS
             exit 1
         fi
     done
+
+    #### Example: pre_check_dependencies "helm" 
 }
 
 function check_plugin(){
-    COMMAND_PLUGIN_LIST="${1}"
-    PLUGIN_LIST=(${2})
+    local COMMAND_PLUGIN_LIST="${1}"
+    local PLUGIN_LIST=(${2})
 
-    TOOLS_NAME="$(echo "${COMMAND_PLUGIN_LIST}" | awk '{print $1}')"
+    local TOOLS_NAME="$(echo "${COMMAND_PLUGIN_LIST}" | awk '{print $1}')"
 
     for plugin in ${PLUGIN_LIST[@]}; do
         # If not found tools => exit
@@ -112,7 +112,6 @@ ALERTS
 function compare_versions() {
     local VERSION_01=${1}
     local VERSION_02=${2}
-    VERSION_EQ="false"
 
     if [[ ${VERSION_01} == ${VERSION_02} ]]; then
         echo "equal"
@@ -142,6 +141,46 @@ function compare_versions() {
     fi
 }
 
+function about(){
+cat <<ABOUT
+
+******************************************
+* Author: DANG THANH PHAT                *
+* Email: thanhphat@itblognote.com        *
+* Blog: www.itblognote.com               *
+* Version: 1.2                           *
+* Purpose: Tools to deploy helm charts.  *
+******************************************
+
+Use --help or -h to check syntax, please !
+
+ABOUT
+    exit 1
+}
+
+function help(){
+cat <<HELP
+
+Usage: helm-charts [options...] [method...] [debug...]
+
+[*] OPTIONS:
+    -h, --help            Show help
+    -v, --version         Show info and version
+    apply                 Start deploy helm charts to ACR, HTTP, S3,...
+    plan                  (This is default value) - plan will have people know what will happen
+
+[*] METHOD:
+    http                  You can create a server helm with 'chartmuseum' to deploy
+    s3                    Deploy helm to S3 Bucket service AWS
+    acr                   Deploy helm to ACR service Azure
+
+[*] DEBUG: (Support for DevOps code, default value is +x)
+    -x, +x                Use flag -x with set to debug and show log command contrary +x to hide
+
+HELP
+    exit 1
+}
+
 function pre_checking()
 {
     echo "[+] ACTION: ${ACTION}"
@@ -153,13 +192,13 @@ function pre_checking()
     local RESULT_COMPARE_HELM_VERSION=$(compare_versions "${HELM_VERSION_CURRENT}" "${HELM_VERSION_LIMMIT}")
 
     if [[ ${RESULT_COMPARE_HELM_VERSION} == "less" ]];then
-        echo "[WARNING] Because helm version current less than 3.8.0, so we will add variable [HELM_EXPERIMENTAL_OCI=1]"
+        echo -e "${YC}[WARNING] Because helm version current less than 3.8.0, so we will add variable [HELM_EXPERIMENTAL_OCI=1]"
         export HELM_EXPERIMENTAL_OCI=1
     fi
 
     # Check if we miss credentials for AWS Helm S3 Plugin
     if [[ "${METHOD}" == "s3" ]];then
-        FLAG_FOUND_AWS_CREDS="false"
+        local FLAG_FOUND_AWS_CREDS="false"
 
         # We need to check available AWS Credentials
         if [[ "$(env | grep -i AWS_PROFILE | awk -F'=' '{print $2}')" != "" ]];then
@@ -455,7 +494,7 @@ function build_helm_charts(){
             echo ""
         else
             echo "[+] ACTION: ${ACTION}"
-            echo "[-] Stop processing upload Helm Chart: $CHART_NAME"
+            echo "[-] Stop processing upload Helm Chart: ${CHART_NAME}"
         fi
 
     done < ${TMPFILE}
@@ -464,33 +503,30 @@ function build_helm_charts(){
 
 ###### START
 function main(){
-    # Checking supported tool & plugin on local machine
-    pre_check_dependencies "helm"
+    # Action based on ${ACTION} arg
+    case ${ACTION} in
+    "-v" | "--version")
+        about
+        ;;
+    "-h" | "--help")
+        help
+        ;;
+    *)
+        # Checking supported tool & plugin on local machine
+        pre_check_dependencies "helm"
 
-    # Pre-checking
-    pre_checking
-    
-    # Find chart list in source
-    find_charts_list
+        # Pre-checking
+        pre_checking
+        
+        # Find chart list in source
+        find_charts_list
 
-    # Connect to helm private repo
-    connect_helm_repo
+        # Connect to helm private repo
+        connect_helm_repo
 
-    build_helm_charts
-
-    # # Action based on ${ACTION} arg
-    # case ${ACTION} in
-    # "-v" | "--version")
-    #     about
-    #     ;;
-    # "-h" | "--help")
-    #     help
-    #     ;;
-    # *)
-    #     # echo -n "Error: Something wrong"
-    #     # help
-    #     ;;
-    # esac
+        build_helm_charts
+        ;;
+    esac
 
     # Clean trash of service
     cleanup
