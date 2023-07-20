@@ -485,9 +485,11 @@ function build_helm_charts(){
                 if [[ $(cat ${TMPFILE_CHART_INFO_REPO} | wc -l) -ne 0 ]];then
                     #helm push --force ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
                     #az acr helm push --force -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
-                    helm push ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME} -n ${ACR_NAME} -u ${AZ_USER}
+                    az acr login --name ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD}
+                    helm push ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
                 else
-                    helm push ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME} -n ${ACR_NAME} -u ${AZ_USER}
+                    az acr login --name ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD}
+                    helm push ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
                     #helm push ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
                     #az acr helm push -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
                 fi
