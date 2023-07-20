@@ -483,7 +483,7 @@ function build_helm_charts(){
             elif [[ "${METHOD}" == "acr" ]];then
                 check_var "ACR_NAME AZ_USER AZ_PASSWORD"
                 pre_check_dependencies "az"
-                if [[ $(helm push --force ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}) ]];then
+                if [[ $(helm push ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}) ]];then
                     echo "Upload"
                 else
                     echo "khong upload"
