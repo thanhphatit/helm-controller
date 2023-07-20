@@ -343,6 +343,7 @@ function connect_helm_repo(){
         # Connect to Helm Chart Service with ACR Method
         helm repo add ${HELM_PRIVATE_REPO_NAME} https://${ACR_NAME}.azurecr.io/helm/v1/repo --username ${AZ_USER} --password ${AZ_PASSWORD}
         helm registry login ${ACR_NAME}.azurecr.io --username ${AZ_USER} --password ${AZ_PASSWORD}
+        az acr login --name ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} &>/dev/null
 
     elif [[ "${METHOD}" == "http" ]];then
         if [[ ${HTTP_USER} == "none" && ${HTTP_PASSWORD} == "none" ]];then
@@ -482,17 +483,20 @@ function build_helm_charts(){
             elif [[ "${METHOD}" == "acr" ]];then
                 check_var "ACR_NAME AZ_USER AZ_PASSWORD"
                 pre_check_dependencies "az"
-                if [[ $(cat ${TMPFILE_CHART_INFO_REPO} | wc -l) -ne 0 ]];then
-                    #helm push --force ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
-                    #az acr helm push --force -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
-                    az acr login --name ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD}
-                    helm push --force ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
+                if [[ $(helm push --force ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}) ]];then
+                    echo "Upload"
                 else
-                    az acr login --name ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD}
-                    helm push ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
-                    #helm push ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
-                    #az acr helm push -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
+                    echo "khong upload"
                 fi
+                # if [[ $(cat ${TMPFILE_CHART_INFO_REPO} | wc -l) -ne 0 ]];then
+                #     #helm push --force ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
+                #     #az acr helm push --force -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
+                #     helm push --force ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
+                # else
+                #     helm push ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
+                #     #helm push ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
+                #     #az acr helm push -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
+                # fi
             fi
 
             echo ""
