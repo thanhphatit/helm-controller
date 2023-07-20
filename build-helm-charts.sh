@@ -486,7 +486,7 @@ function build_helm_charts(){
                     #helm push --force ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
                     #az acr helm push --force -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
                     az acr login --name ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD}
-                    helm push ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
+                    helm push --force ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
                 else
                     az acr login --name ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD}
                     helm push ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
