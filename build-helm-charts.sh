@@ -96,7 +96,7 @@ function check_plugin(){
 
     for plugin in ${PLUGIN_LIST[@]}; do
         # If not found tools => exit
-        if [[ ! $(${COMMAND_PLUGIN_LIST} | grep -i "^${plugin}") ]];then
+        if [[ ! $(${COMMAND_PLUGIN_LIST} 2>/dev/null | grep -i "^${plugin}") ]];then
 cat << ALERTS
 [x] Not found this ${TOOLS_NAME} plugin [${plugin}] on machine.
 
@@ -106,7 +106,7 @@ ALERTS
         fi
     done
 
-    #### Example: check_plugin "cm-push diff s3" 
+    #### Example: check_plugin "helm plugin list" "cm-push diff s3" 
 }
 
 function compare_versions() {
@@ -190,6 +190,16 @@ function pre_checking()
     local HELM_VERSION_LIMMIT="3.8.0"
 
     local RESULT_COMPARE_HELM_VERSION=$(compare_versions "${HELM_VERSION_CURRENT}" "${HELM_VERSION_LIMMIT}")
+    local RESULT_CHECK_PLUGIN_HELM_DIFF=$(check_plugin "helm plugin list" "diff")
+    local RESULT_CHECK_PLUGIN_HELM_PUSH=$(check_plugin "helm plugin list" "cm-push")
+
+    if [[ "${RESULT_CHECK_PLUGIN_HELM_DIFF}" != "" ]];then
+        helm plugin install https://github.com/databus23/helm-diff &>/dev/null
+    fi
+    
+    if [[ "${RESULT_CHECK_PLUGIN_HELM_PUSH}" != "" ]];then
+        helm plugin install https://github.com/chartmuseum/helm-push.git &>/dev/null
+    fi
 
     if [[ ${RESULT_COMPARE_HELM_VERSION} == "less" ]];then
         echo -e "${YC}[WARNING] Because helm version current less than 3.8.0, so we will add variable [HELM_EXPERIMENTAL_OCI=1]"
