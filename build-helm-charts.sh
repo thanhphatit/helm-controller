@@ -190,13 +190,14 @@ function pre_checking()
     local HELM_VERSION_LIMMIT="3.8.0"
 
     local RESULT_COMPARE_HELM_VERSION=$(compare_versions "${HELM_VERSION_CURRENT}" "${HELM_VERSION_LIMMIT}")
+    
     local RESULT_CHECK_PLUGIN_HELM_DIFF=$(check_plugin "helm plugin list" "diff")
     local RESULT_CHECK_PLUGIN_HELM_PUSH=$(check_plugin "helm plugin list" "cm-push")
 
     if [[ "${RESULT_CHECK_PLUGIN_HELM_DIFF}" != "" ]];then
         helm plugin install https://github.com/databus23/helm-diff &>/dev/null
     fi
-    
+
     if [[ "${RESULT_CHECK_PLUGIN_HELM_PUSH}" != "" ]];then
         helm plugin install https://github.com/chartmuseum/helm-push.git &>/dev/null
     fi
