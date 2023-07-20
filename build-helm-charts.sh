@@ -14,7 +14,7 @@
 #### GLOBAL SETTING SHELL
 
 set -o pipefail
-set -e
+# set -e ### When you use -e it will export error when logic function fail, example grep "yml" if yml not found
 
 ####################
 # GLOBAL VARIABLES #
@@ -23,7 +23,7 @@ set -e
 #### VARIABLES
 
 # Action: plan will have people know what will happen
-# Method: will help script to choose method to connect Helm Repo: web http or aws s3 bucket
+# Method: will help script to choose method to connect Helm Repo: web http or aws s3 bucket, acr of azure
 ACTION="${1:-plan}"
 METHOD="${2:-http}" # Valid value: http / s3 / acr
 DEBUG="${3:-+x}"
@@ -96,7 +96,7 @@ function check_plugin(){
 
     for plugin in ${PLUGIN_LIST[@]}; do
         # If not found tools => exit
-        if [[ ! $(${COMMAND_PLUGIN_LIST} | grep "${plugin}") ]];then
+        if [[ ! $(${COMMAND_PLUGIN_LIST} | grep -i "^${plugin}") ]];then
 cat << ALERTS
 [x] Not found this ${TOOLS_NAME} plugin [${plugin}] on machine.
 
@@ -483,11 +483,13 @@ function build_helm_charts(){
                 check_var "ACR_NAME AZ_USER AZ_PASSWORD"
                 pre_check_dependencies "az"
                 if [[ $(cat ${TMPFILE_CHART_INFO_REPO} | wc -l) -ne 0 ]];then
-                    az acr helm push --force -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
                     #helm push --force ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
+                    #az acr helm push --force -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
+                    helm push ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME} -n ${ACR_NAME} -u ${AZ_USER}
                 else
+                    helm push ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME} -n ${ACR_NAME} -u ${AZ_USER}
                     #helm push ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}
-                    az acr helm push -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
+                    #az acr helm push -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
                 fi
             fi
 
