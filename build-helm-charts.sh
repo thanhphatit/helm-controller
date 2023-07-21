@@ -11,14 +11,10 @@
 ## Cautions:
 ## - No allow to override current version of helm package
 
-##### SHELL SETTINGS
-set -o pipefail
-set +x; ## Use flag -x with set to debug and show log command, and +x to hide
-## set -e ### When you use -e it will export error when logic function fail, example grep "yml" if yml not found
-
 ##### GLOBAL VARIABLES
 ACTION="${1:-plan}" ## Default with `plan` will have people know what will happen
 METHOD="${2:-http}" ## Will help script to choose method to connect Helm Repo: web http or aws s3 bucket, acr of azure. Valid value: http / s3 / acr
+DEBUG="${3:-+x}"
 
 # Directory contains template charts
 DIR_CHARTS="${PWD}/charts"
@@ -37,6 +33,11 @@ TMPFILE=$(mktemp /tmp/tempfile-XXXXXXXX)
 TMPFILE_LIST_CHARTS=$(mktemp /tmp/tempfile-list-charts-XXXXXXXX)
 TMPFILE_CHART_INFO_REPO=$(mktemp /tmp/tempfile-chart-info-repo-XXXXXXXX)
 TMPDIR_PACKAGE_CHARTS=$(mktemp -d /tmp/tmpdir-helm-charts-package-XXXXXX)
+
+##### SHELL SETTINGS
+## set -e ### When you use -e it will export error when logic function fail, example grep "yml" if yml not found
+set -o pipefail
+set ${DEBUG}; ## Use flag -x with set to debug and show log command, and +x to hide
 
 ### Used with echo have flag -e
 RLC="\033[1;31m"    ## Use redlight color
