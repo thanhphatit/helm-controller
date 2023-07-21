@@ -4,32 +4,21 @@
 ## Web/blogs: www.itblognote.com
 ## Description:
 ## + Tools need to install: helm 
-##         helm plugin: helm push and helm s3
+## + Helm plugin: helm push and helm s3
 ##         helm plugin install https://github.com/chartmuseum/helm-push.git
 ##         helm plugin install https://github.com/hypnoglow/helm-s3.git
 ##
 ## Cautions:
 ## - No allow to override current version of helm package
 
-#### GLOBAL SETTING SHELL
-
+##### SHELL SETTINGS
 set -o pipefail
-# set -e ### When you use -e it will export error when logic function fail, example grep "yml" if yml not found
+set +x; ## Use flag -x with set to debug and show log command, and +x to hide
+## set -e ### When you use -e it will export error when logic function fail, example grep "yml" if yml not found
 
-####################
-# GLOBAL VARIABLES #
-####################
-
-#### VARIABLES
-
-# Action: plan will have people know what will happen
-# Method: will help script to choose method to connect Helm Repo: web http or aws s3 bucket, acr of azure
-ACTION="${1:-plan}"
-METHOD="${2:-http}" # Valid value: http / s3 / acr
-DEBUG="${3:-+x}"
-
-### Use flag -x with set to debug and show log command, and +x to hide
-set ${DEBUG};
+##### GLOBAL VARIABLES
+ACTION="${1:-plan}" ## Default with `plan` will have people know what will happen
+METHOD="${2:-http}" ## Will help script to choose method to connect Helm Repo: web http or aws s3 bucket, acr of azure. Valid value: http / s3 / acr
 
 # Directory contains template charts
 DIR_CHARTS="${PWD}/charts"
@@ -63,10 +52,12 @@ function check_var(){
 
     for var in ${VAR_LIST[@]}; do
         if [[ -z "$(eval echo $(echo $`eval echo "${var}"`))" ]];then
-            echo -e "${YC}[CAUTIONS] Variable ${var} not found!"
+            echo -e "${YC}[CAUTIONS] Variable [${var}] not found!"
             exit 1
         fi
     done
+
+    #### Example: check_var "DEVOPS THANHPHATIT"
 }
 
 function pre_check_dependencies(){
@@ -148,7 +139,7 @@ cat <<ABOUT
 * Author: DANG THANH PHAT                *
 * Email: thanhphat@itblognote.com        *
 * Blog: www.itblognote.com               *
-* Version: 1.2                           *
+* Version: 1.3                           *
 * Purpose: Tools to deploy helm charts.  *
 ******************************************
 
