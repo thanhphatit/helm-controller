@@ -378,15 +378,15 @@ function build_helm_charts(){
     ################################
     # Loop process each chart repo #
     ################################
-    CHART_COMMITID_VERSION_ENABLE="${CHART_COMMITID_VERSION_ENABLE:-false}"
+    CHART_VERSION_MANUALLY="${CHART_VERSION_MANUALLY:-false}"
 
     while read chart
     do
         DIR_CHART_REPO="$(dirname $chart)"
         CHART_NAME=$(cat ${DIR_CHART_REPO}/Chart.yaml | grep -i "^name" | awk -F':' '{print $2}' | tr -d ' ')
-        if [[ ${CHART_COMMITID_VERSION_ENABLE} == "true" ]];then
-            check_var 'CHART_COMMITID_VERSION'
-            CHART_PACKAGE_VERSION=${CHART_COMMITID_VERSION}
+        if [[ ${CHART_VERSION_MANUALLY} == "true" ]];then
+            check_var 'CHART_VERSION'
+            CHART_PACKAGE_VERSION=${CHART_VERSION}
         else
             CHART_PACKAGE_VERSION=$(cat ${DIR_CHART_REPO}/Chart.yaml | grep -i "^version" | awk -F':' '{print $2}' | tr -d ' ')
         fi
@@ -455,7 +455,7 @@ function build_helm_charts(){
             echo "[-] Helm push: ${CHART_NAME} => repo: ${HELM_PRIVATE_REPO_NAME}"
 
             # We need to package chart first then push with S3 plugin
-            if [[ ${CHART_COMMITID_VERSION_ENABLE} == "true" ]];then
+            if [[ ${CHART_VERSION_MANUALLY} == "true" ]];then
                 HELM_COMMAND_VERSION="--version ${CHART_PACKAGE_VERSION}"
             fi
 
