@@ -487,13 +487,18 @@ function build_helm_charts(){
                 check_var "ACR_NAME AZ_USER AZ_PASSWORD"
                 pre_check_dependencies "az"
 
-                if [[ $(helm push ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}) ]];then
-                    if [[ $(cat ${TMPFILE_CHART_INFO_REPO} | wc -l) -ne 0 ]];then
-                        az acr helm push --force -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
-                    else
-                        az acr helm push -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
-                    fi
+                if [[ $(cat ${TMPFILE_CHART_INFO_REPO} | wc -l) -ne 0 ]];then
+                    az acr helm push --force -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
+                else
+                    az acr helm push -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
                 fi
+                # if [[ $(helm push ${PACKAGE_PATH} ${ACR_ARTIFACT_NAME}) ]];then
+                #     if [[ $(cat ${TMPFILE_CHART_INFO_REPO} | wc -l) -ne 0 ]];then
+                #         az acr helm push --force -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
+                #     else
+                #         az acr helm push -n ${ACR_NAME} -u ${AZ_USER} -p ${AZ_PASSWORD} ${PACKAGE_PATH}
+                #     fi
+                # fi
             fi
 
             echo ""
